@@ -1,0 +1,146 @@
+# Guilty Memories
+# Deadline: 26/06/2025
+# Coded by: Toto :)
+
+import pygame
+import random
+import time
+pygame.init()
+
+# Screen parameters
+width, height = 780, 500
+box_size = 100
+target_size = 100
+num_boxes = 9
+
+screen = pygame.display.set_mode((width, height))
+pygame.display.set_caption("Guilty Memories")
+
+# Timer
+total_time = 60
+
+# --- LOADING ASSETS ---
+font = pygame.font.Font("DailyMemory-EBdl.ttf", 30)
+big_font = pygame.font.Font("DailyMemory-EBdl.ttf", 80)
+small_font = pygame.font.SysFont("courier new", 20)
+
+background_img = pygame.image.load("background.jpg").convert()
+menu_background_img = pygame.image.load("menu.jpg").convert()
+background_img = pygame.transform.scale(background_img, (width, height))
+menu_background_img = pygame.transform.scale(menu_background_img, (width, height))
+
+# --- MENU ---
+def draw_text(surface, text, font, color, x, y):
+    text_surface = font.render(text, True, color)
+    rect = text_surface.get_rect(center=(x, y))
+    surface.blit(text_surface, rect)
+
+def menu_screen():
+    menu = True
+    play_button = pygame.Rect(width//2 - 100, height//2 - 60, 200, 50)
+    quit_button = pygame.Rect(width//2 - 100, height//2 + 20, 200, 50)
+    
+    while menu:
+        screen.blit(menu_background_img, (0, 0))
+        draw_text(screen, "Guilty Memories", big_font, (255, 255, 255), width//2, height//2 - 120)
+        pygame.draw.rect(screen, (0, 200, 0), play_button)
+        pygame.draw.rect(screen, (200, 0, 0), quit_button)
+        draw_text(screen, "Play", font, (255, 255, 255), play_button.centerx, play_button.centery)
+        draw_text(screen, "Quit", font, (255, 255, 255), quit_button.centerx, quit_button.centery)
+
+        pygame.display.update()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if play_button.collidepoint(event.pos):
+                    menu = False
+                elif quit_button.collidepoint(event.pos):
+                    pygame.quit()
+                    exit()
+
+# --- GAME SETUP ---
+boxes = []
+targets = []
+
+def reset_game():
+    boxes.clear()
+    targets.clear()
+
+    for i in range(num_boxes):
+        x = random.randint(0, width - box_size)
+        y = random.randint(0, height - box_size)
+        box = pygame.Rect(x, y, box_size, box_size)
+        boxes.append(box)
+
+        grid_x = (i % 3) * (width // 3) + (width // 6 - target_size // 2)
+        grid_y = (i // 3) * (height // 3) + (height // 6 - target_size // 2)
+        target = pygame.Rect(grid_x, grid_y, target_size, target_size)
+        targets.append(target)
+        
+    global active_box, offset_x, offset_y, start_time
+    active_box = None
+    offset_x = 0
+    offset_y = 0
+    start_time = time.time()
+
+menu_screen()
+reset_game()
+
+# --- MAIN GAME LOOP ---
+run = True
+while run:
+    elapsed_seconds = int(time.time() - start_time)
+    remaining_time = max(0, total_time - elapsed_seconds)
+
+    screen.blit(background_img, (0, 0))
+
+    for target in targets:
+        pygame.draw.rect(screen, (128, 0, 128), target, 3)
+
+    for box in boxes:
+        pygame.draw.rect(screen, (255,192,203), box)
+
+    timer_text = f"Time: {remaining_time}s"
+    draw_text(screen, timer_text, small_font, (255, 255, 255), width - 80, 30)
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            run = False
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for idx, box in enumerate(boxes):
+                if box.collidepoint(event.pos):
+                    active_box = idx
+                    offset_x = box.x - event.pos[0]
+                    offset_y = box.y - event.pos[1]
+                    break
+        elif event.type == pygame.MOUSEMOTION and 'active_box' in globals() and active_box is not None:
+            boxes[active_box].x = event.pos[0] + offset_x
+            boxes[active_box].y = event.pos[1] + offset_y
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1 and 'active_box' in globals() and active_box is not None:
+            box = boxes[active_box]
+            target = targets[active_box]
+            if abs(box.centerx - target.centerx) < 20 and abs(box.centery - target.centery) < 20:
+                box.center = target.center
+            active_box = None
+
+    # --- WIN CHECK ---
+    all_on_targets = all(
+        box.center == target.center
+        for box, target in zip(boxes, targets)
+    )
+    if all_on_targets:
+        print("You win!")
+        menu_screen()
+        reset_game()
+
+    # --- LOSE CHECK ---
+    if remaining_time <= 0:
+        print("Time's up! You lost!")
+        menu_screen()
+        reset_game()
+
+    pygame.display.update()
+
+pygame.quit()
